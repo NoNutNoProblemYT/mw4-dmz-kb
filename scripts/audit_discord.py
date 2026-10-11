@@ -7,18 +7,33 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN")
 DISCORD_GUILD_ID = os.environ.get("DISCORD_GUILD_ID")
 
+print(f"DEBUG: Guild ID loaded: {DISCORD_GUILD_ID}")
+print(f"DEBUG: Bot Token loaded: {'Yes (Length: ' + str(len(DISCORD_BOT_TOKEN)) + ')' if DISCORD_BOT_TOKEN else 'MISSING'}")
+
 genai.configure(api_key=GEMINI_API_KEY)
 
 def fetch_discord_structure():
     headers = {"Authorization": f"Bot {DISCORD_BOT_TOKEN}"}
     
-    roles_resp = requests.get(f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/roles", headers=headers)
+    # Fetch Roles
+    roles_url = f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/roles"
+    roles_resp = requests.get(roles_url, headers=headers)
+    print(f"Roles API Status Code: {roles_resp.status_code}")
+    if roles_resp.status_code != 200:
+        print(f"Roles API Error: {roles_resp.text}")
+        
     roles = roles_resp.json() if roles_resp.status_code == 200 else []
     
-    channels_resp = requests.get(f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/channels", headers=headers)
+    # Fetch Channels
+    channels_url = f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/channels"
+    channels_resp = requests.get(channels_url, headers=headers)
+    print(f"Channels API Status Code: {channels_resp.status_code}")
+    if channels_resp.status_code != 200:
+        print(f"Channels API Error: {channels_resp.text}")
+        
     channels = channels_resp.json() if channels_resp.status_code == 200 else []
     
-    clean_roles = [{"name": r["name"], "permissions": r["permissions"], "position": r["position"], "hoist": r["hoist"]} for r in roles]
+    clean_roles = [{"name": r.get("name"), "permissions": r.get("permissions"), "position": r.get("position"), "hoist": r.get("hoist")} for r in roles]
     clean_channels = []
     for c in channels:
         clean_channels.append({
@@ -53,8 +68,8 @@ def main():
     server_data = fetch_discord_structure()
     
     if not server_data["roles"] and not server_data["channels"]:
-        print("Error: Could not fetch server data. Check your bot token and Guild ID.")
-        return
+        print("CRITICAL ERROR: Could not fetch server roles or channels. Exiting.")
+        exit(1)
 
     print("Running AI architectural audit via Gemini...")
     audit_report = audit_server_with_gemini(server_data)
