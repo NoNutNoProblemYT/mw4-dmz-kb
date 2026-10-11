@@ -106,7 +106,7 @@ def verify_and_format_with_gemini(db_index, articles):
       "tldr_summary": "quick-reading TL;DR summary of the new items or empty"
     }}
     """
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-3.8-flash")
     response = model.generate_content(
         prompt, 
         generation_config={"response_mime_type": "application/json"}
