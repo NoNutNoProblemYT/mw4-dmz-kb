@@ -87,7 +87,7 @@ def verify_and_format_with_gemini(db_index, articles):
       - Add new topics to `new_topics`.
       - Write clean Markdown format for documentation appending.
       - Draft an official Discord alert embed summary highlighting exact patch/change details.
-
+    
     Respond ONLY with valid JSON matching this schema:
     {{
       "has_new_intel": boolean,
@@ -102,6 +102,17 @@ def verify_and_format_with_gemini(db_index, articles):
         generation_config={"response_mime_type": "application/json"}
     )
     return json.loads(response.text)
+
+def write_step_summary(status_text, details=""):
+    summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_file:
+        with open(summary_file, "a") as f:
+            f.write(f"### 🔍 MW4 DMZ Intel Check Report\n")
+            f.write(f"- **Check Time:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
+            f.write(f"- **Feeds Checked:** {len(OFFICIAL_FEEDS)} official sources\n")
+            f.write(f"- **Status:** {status_text}\n")
+            if details:
+                f.write(f"\n{details}\n")
 
 def send_discord_notification(summary):
     if not DISCORD_WEBHOOK_URL or not summary:
@@ -122,9 +133,10 @@ def main():
     db_index = load_db_index()
     articles = fetch_official_news()
     unprocessed = [a for a in articles if a["id"] not in db_index["processed_ids"]]
-
+    
     if not unprocessed:
         print("No new RSS entries from official feeds.")
+        write_step_summary("💤 Checked. No new raw RSS items found from official feeds.")
         return
 
     print(f"Evaluating {len(unprocessed)} new official entries via Gemini verification...")
@@ -135,20 +147,25 @@ def main():
 
     if result.get("has_new_intel"):
         print("New official DMZ patch notes/updates verified! Updating database...")
-
+        
         if os.path.exists(DOCS_PATH):
             with open(DOCS_PATH, "a") as f:
                 f.write("\n\n## 🔄 Automated Updates\n\n" + result["markdown_entry"])
-
+        
         db_index["verified_topics"].extend(result.get("new_topics", []))
         db_index["verified_topics"] = list(set(db_index["verified_topics"]))
         db_index["last_updated"] = datetime.utcnow().isoformat()
-
+        
         save_db_index(db_index)
         send_discord_notification(result["discord_summary"])
+        write_step_summary(
+            "✅ **New intel found and synced!**", 
+            f"**Synced Topics:** {', '.join(result.get('new_topics', []))}\n**README & Discord updated successfully.**"
+        )
         print("Sync complete. Discord notified.")
     else:
         save_db_index(db_index)
+        write_step_summary("💤 Checked. New RSS items were found, but were either duplicates or not relevant to MW4 DMZ.")
         print("No new official DMZ patch notes or non-duplicate updates found.")
 
 if __name__ == "__main__":
