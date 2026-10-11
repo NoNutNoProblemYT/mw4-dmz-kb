@@ -59,7 +59,7 @@ def audit_server_with_gemini(server_data):
     
     Format your response cleanly in Markdown with bold headers and bullet points.
     """
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-3.8-flash")
     response = model.generate_content(prompt)
     return response.text
 
