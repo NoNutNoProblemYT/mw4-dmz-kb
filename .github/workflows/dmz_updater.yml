@@ -1,0 +1,45 @@
+name: DMZ Knowledge Base Automated Sync
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-kb:
+  name: DMZ Knowledge Base Automated Sync
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install feedparser requests google-generativeai
+
+      - name: Run DMZ Intel Updater
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/update_kb.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "dmz-kb-bot[bot]"
+          git config --global user.email "dmz-kb-bot@users.noreply.github.com"
+          git add db/intel_index.json README.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "auto(kb): sync official DMZ patch notes and update database"
+            git push
+          fi
